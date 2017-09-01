@@ -1,0 +1,171 @@
+cd ~
+mkdir bin
+
+#Set up repositories:
+mkdir meta
+cd meta
+git clone https://github.com/ancient-eDNA/Holi
+git clone https://github.com/DerrickWood/kraken
+git clone https://github.com/HadrienG/Kraken_db_install_scripts.git #for updated database scripts
+git clone https://github.com/infphilo/centrifuge.git
+git clone https://github.com/marbl/Krona.git
+
+#Get Jellyfish 1.*
+wget http://www.cbcb.umd.edu/software/jellyfish/jellyfish-1.1.11.tar.gz
+tar -xzf jellyfish-1.1.11.tar.gz
+rm jellyfish-1.1.11.tar.gz
+
+#To install jellyfish in a custom directory:
+cd jellfyish-1.1.11
+./configure --prefix=$HOME/bin/jellyfish
+make
+make install
+
+export PATH=~/bin/jellyfish/bin:$PATH
+export LD_LIBRARY_PATH=~/bin/jellyfish/lib:$LD_LIBRARY_PATH
+export MANPATH=~/bin/jellyfish/share/man:$MANPATH
+export PKG_CONFIG_PATH=~/bin/jellyfish/lib/pkgconfig:$PKG_CONFIG_PATH
+##OR APPEND ~/.bashrc
+
+##move HadrienG's scripts for new NCBI structure into Kraken:
+mv ./Kraken_db_install_scripts/kraken_shell_scripts/* ./kraken/scripts
+
+
+
+##Kraken Installation:
+mkdir kraken_bin
+cd kraken
+./install_kraken.sh ~/nas3/kraken_bin
+
+##Move kraken scripts to bin...
+cp ~/nas3/kraken_bin/* ~/bin/
+
+cd Krona/KronaTools
+
+./install.pl --prefix ./ --taxonomy ./taxonomy
+./updateAccesions.sh
+
+
+
+##STOP####!!!!### BELOW: kraken database build is not what I did.
+
+#Start custom database:
+kraken-build --download-taxonomy --db ./kdb_test
+
+
+#kraken-build --download-library bacteria --db ./kdb_test
+#kraken-build --download-library viruses --db ./kdb_test
+#kraken-build --download-library fungi --db ./kdb_test
+##kraken-build --download-library protozoa --db ./kdb_test
+#kraken-build --download-library plasmids --db ./kdb_test
+##kraken-build --download-library human --db ./kdb_test
+
+
+
+##Plant seqs for Kraken
+#Just chloroplast refseq
+./get_plastid_genes/ncbi2kraken.py -e 'rharbert@amnh.org' -s 'chloroplast[All Fields] AND (refseq[filter] AND chloroplast[filter]' -o ./plastids_refseq
+
+#All chloroplast genes
+./get_plastid_genes/ncbi2kraken.py -e 'rharbert@amnh.org' -s 'genbank[filter] AND (plants[filter] AND biomol_genomic[PROP]) AND (plants[filter] AND biomol_genomic[PROP] AND chloroplast[filter] AND ("200"[SLEN] : "5000"[SLEN]))' -o ./plants_genbank
+
+##Get nt fasta file
+wget ftp://ftp.ncbi.nih.gov/blast/db/FASTA/nt.gz
+gunzip nt.gz
+mv -v nt nt.fa
+
+
+##Add plants to DB:
+kraken-build --add-to-library ./plastids_refseq/final.fa --db ./kdb_test
+kraken-build --add-to-library ./plants_genbank/final.fa --db ./kdb_test
+#kraken-build --add-to-library /database/nt_fa/nt.fa --db ./kdb2
+
+##Build custom database
+qsub -V -N kraken_db_build -l walltime=48:00:00,nodes=1:ppn=64 -- ~/bin/kraken-build --build --threads 64 --max-db-size 150 --db ~/nas3/meta/kdb_test
+
+
+##Run after build::
+kraken-build --clean --db ./kdb_test
+
+
+
+##Get soil metagenomic sequences
+mkdir fastq
+cd fastq
+wget $(cat ./urlist)
+gunzip -f *.gz
+cd ..
+
+#wget ./fastq/urlist #a list of ftp links to sequence data:
+
+##Run Kraken on all fastq files in directory fastq
+qsub -V -N meta12 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560012.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta13 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560013.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta14 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560014.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta15 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560015.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta16 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560016.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta17 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560017.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta18 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560018.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta19 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560019.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta20 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560020.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta21 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560021.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta22 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560022.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta23 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560023.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta24 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560024.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta25 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560025.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta93 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560093.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta94 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560094.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta95 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560095.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta96 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560096.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta97 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560097.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta98 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560098.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta99 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560099.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta100 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560100.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta101 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560101.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta102 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560102.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta103 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560103.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta104 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560104.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta105 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560105.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta106 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560106.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta107 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560107.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta108 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560108.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta109 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560109.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta110 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560110.fastq soils.res /home/rharbert/nas3/meta
+qsub -V -N meta213 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq ~/nas3/meta/fastq/ERR1560213.fastq soils.res /home/rharbert/nas3/meta
+
+###Simulation
+qsub -V -N metasim10 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/meta_sim simfile meta_sim/10_1 /home/rharbert/nas3/meta 10
+qsub -V -N metasim10 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/meta_sim simfile meta_sim/10_2 /home/rharbert/nas3/meta 10
+qsub -V -N metasim10 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/meta_sim simfile meta_sim/10_3 /home/rharbert/nas3/meta 10
+qsub -V -N metasim10 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/meta_sim simfile meta_sim/10_4 /home/rharbert/nas3/meta 10
+qsub -V -N metasim10 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/meta_sim simfile meta_sim/10_5 /home/rharbert/nas3/meta 10
+
+qsub -V -N metasim50 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/meta_sim simfile meta_sim/50_1 /home/rharbert/nas3/meta 50
+qsub -V -N metasim50 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/meta_sim simfile meta_sim/50_2 /home/rharbert/nas3/meta 50
+qsub -V -N metasim50 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/meta_sim simfile meta_sim/50_3 /home/rharbert/nas3/meta 50
+qsub -V -N metasim50 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/meta_sim simfile meta_sim/50_4 /home/rharbert/nas3/meta 50
+qsub -V -N metasim50 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/meta_sim simfile meta_sim/50_5 /home/rharbert/nas3/meta 50
+
+qsub -V -N metasim100 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/meta_sim simfile meta_sim/100_1 /home/rharbert/nas3/meta 100
+qsub -V -N metasim100 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/meta_sim simfile meta_sim/100_2 /home/rharbert/nas3/meta 100
+qsub -V -N metasim100 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/meta_sim simfile meta_sim/100_3 /home/rharbert/nas3/meta 100
+qsub -V -N metasim100 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/meta_sim simfile meta_sim/100_4 /home/rharbert/nas3/meta 100
+qsub -V -N metasim100 -l walltime=32:00:00,nodes=1:ppn=4 -- /usr/bin/bash ~/nas3/meta/reproduce/meta_sim simfile meta_sim/100_5 /home/rharbert/nas3/meta 100
+
+
+###TRY Centrifuge with nt
+##get nt.fa database
+## get acc2taxid.map
+wget ftp://ftp.ncbi.nih.gov/pub/taxonomy/accession2taxid/nucl_gb.accession2taxid.gz
+gunzip nucl_gb.accession2taxid.gz
+
+
+
+centrifuge-download -o taxonomy taxonomy
+
+centrifuge-build -p 16 --bmax 1342177280 --conversion-table gi_taxid_nucl.map --taxonomy-tree taxonomy/nodes.dmp --name-table taxonomy/names.dmp  /database/nt_fa/nt.fa ./nt &
+centrifuge -p 16 -q -x ./centrifuge/nt -U fastq/ERR1560012.fastq -S 12.cout
+
+####wgsim -- Generate simulated data to run through kraken ***
+wgsim
+

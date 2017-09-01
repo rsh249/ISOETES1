@@ -1,0 +1,216 @@
+
+###R for processing kraken/centrifuge output
+tryCatch({
+	k = read.csv('./krak/kreport', sep='', header=F)
+	k$V1 = as.numeric(as.character(k$V1))
+	k$V2 = as.numeric(as.character(k$V2))
+	k = subset(k, k$V4!='U')
+	k = subset(k, k$V4!='-')
+
+	#totalclassified=sum(k$V2, na.rm=T);
+	totalclassified=sum(subset(k, k$V6=='Viridiplantae')$V2, na.rm=T)
+	write.table(as.integer(totalclassified), file='krakhits.o');
+
+	k.G <- subset(k, k$V4=="G")
+	k.Gtop <- subset(k.G, as.numeric(as.character(k.G$V2))>round(totalclassified*0.001)) #Get IDs that have > 0.1% of classified reads. Following Pedersen, 2016.
+
+	k.Gtop = k.Gtop[order(k.Gtop[,2]),]
+	barplot(k.Gtop$V1, names=k.Gtop$V6, las=3, cex.names=0.3, main = "Kraken Genera")
+	colnames(k.Gtop) = c('percent', 'n_reads_root', 'n_reads_tax', 'class', 'taxid', 'taxon')
+	write.table(k.Gtop, file='genera_th.csv')
+
+	k.O = subset(k, k$V4=='O')
+	k.Otop <- subset(k.O, as.numeric(as.character(k.O$V2))>round(totalclassified*0.001))
+	k.Otop = k.Otop[order(k.Otop[,2]),]
+	barplot(k.Otop$V1, names=k.Otop$V6, las=3, cex.names=0.3, main = "Kraken Orders")
+	colnames(k.Otop) = c('percent', 'n_reads_root', 'n_reads_tax', 'class', 'taxid', 'taxon')
+	write.table(k.Otop, file='orders_th.csv')
+},	 error = function(err) {
+ 
+	 # error handler picks up where error was generated
+	 print(paste("MY_ERROR:  ",err))
+  
+  	return(NA)
+ 
+}, finally = {}
+
+)
+plant_tids = read.table('~/nas3/meta/plant_tids.txt') ##File containing all plant taxon IDs as of August 9, 2017.
+
+tryCatch({
+	c = read.csv('./cent/centrepor.k', sep = '', header=F)
+	c$V1 = as.numeric(as.character(c$V1))
+	c$V2 = as.numeric(as.character(c$V2))
+	c = subset(c, c$V4!='U')
+	c = subset(c, c$V4!='-')
+	c = c[which(c$V5 %in% plant_tids[,1]),]
+	#totalcent=sum(c$V2, na.rm=T);
+	totalcent=sum(subset(c, c$V6=='Viridiplantae')$V2, na.rm=T)
+	write.table(totalcent, file = 'centhits.o');
+
+	c.G <- subset(c, c$V4=="G")
+	c.Gtop <- subset(c.G, as.numeric(as.character(c.G$V2))>round(totalcent*0.001)) #Get IDs that have > 0.1% of classified reads. Following Pedersen, 2016.
+	
+	c.Gtop = c.Gtop[order(c.Gtop[,2]),]
+	barplot(c.Gtop$V1, names=c.Gtop$V6, las=3, cex.names=0.3, main="Centrifuge Genera")
+	colnames(c.Gtop) = c('percent', 'n_reads_root', 'n_reads_tax', 'class', 'taxid', 'taxon')
+	write.table(c.Gtop, file='centgenera_th.csv')
+
+	c.O = subset(c, c$V4=='O')
+	c.Otop <- subset(c.O, as.numeric(as.character(c.O$V2))>round(totalcent*0.001))
+	c.Otop = c.Otop[order(c.Otop[,2]),]
+	barplot(c.Otop$V1, names=c.Otop$V6, las=3, cex.names=0.3, main = "Centrifuge Orers")
+	colnames(c.Otop) = c('percent', 'n_reads_root', 'n_reads_tax', 'class', 'taxid', 'taxon')
+	write.table(c.Otop, file='centorders_th.csv')
+      },error = function(err) {
+
+	  # error handler picks up where error was generated
+	  print(paste("MY_ERROR:  ",err))
+
+
+	  return(NA)
+
+	}, finally = {}
+
+)
+
+
+##BLAST hits
+#if(file.exists('./mblast/blast.tax')){
+tryCatch({
+	b = read.csv('./mblast/blast.tax', sep = '')
+	b[,1] = as.numeric(as.character(b[,1]))
+	b.n = read.csv('./mblast/blast.tax.info', sep ='\t', row.names=NULL)
+	b.m = merge(b,b.n, by.x='taxID', by.y='X.taxID')
+	b.m = subset(b.m, b.m$rank == 'genus' | b.m$rank == 'species')
+
+	ord = CHNOSZ::sciname(CHNOSZ::parent(b$taxID, '../../taxonomy', 'order'), '../../taxonomy')
+
+	b.gen = CHNOSZ::sciname(CHNOSZ::parent(b$taxID, '../../taxonomy', 'genus'), '../../taxonomy')
+
+
+	#class genus/order
+	b.class = cbind(ord, b.gen, b$X.count)
+	b.class[,3] = as.numeric(as.character(b.class[,3]))
+	blasthits = sum(as.numeric(b.class[,3]))
+	minhits = round(blasthits*0.001)
+	colnames(b.class) = c("order", "genus", "count")
+	b.agg.ord = aggregate(as.numeric(b.class[,3]), by = list(b.class[,1]), sum)
+	b.agg.gen = aggregate(as.numeric(b.class[,3]), by = list(b.class[,2]), sum)
+	b.orders = subset(b.agg.ord, b.agg.ord[,2]>minhits)
+	b.genera = subset(b.agg.gen, b.agg.gen[,2]>minhits)
+	b.orders = b.orders[order(b.orders[,2]),]
+	b.genera = b.genera[order(b.genera[,2]),]
+	barplot(b.genera[,2], names=b.genera[,1], las=3, cex.names=0.3, main = "megablast Genera")
+	write.table(b.genera, file='blastgen_th.csv')
+	barplot(b.orders[,2], names=b.orders[,1], las=3, cex.names=0.3, main='megablast Orders')
+	write.table(b.orders, file='blastord_th.csv')
+
+	write.table(blasthits, file='blasthits.o');
+
+},	error = function(err) {
+
+	  # error handler picks up where error was generated
+	  print(paste("MY_ERROR:  ",err))
+
+	  return(NA)
+
+	}, finally = {}
+
+)
+
+##if 
+
+
+if(file.exists('./sim.tids')) {
+	parentG=vector();
+	parentO=vector();
+	sim.tid <- read.table('./sim.tids');
+	for(i in 1:length(sim.tid[[1]])){
+
+		#Get all parents of sim.tid[i]
+		parentG[[i]] = CHNOSZ::parent(sim.tid[[1]][i], taxdir='../../taxonomy', rank="genus")
+		parentO[[i]] = CHNOSZ::parent(sim.tid[[1]][i], taxdir='../../taxonomy', rank="order")
+		print(parentG[[i]])
+		print(parentO[[i]])
+
+
+	}
+	#### confusion matrices
+	##NOTE: # of orders of Viridiplantae in the NCBI taxonomy (as of August, 2017) is:
+			##Get taxon IDs from reference database: 
+		#grep ">" ref.fa | awk -F"|" '{print $3}' | awk -F" " '{print $1}' | sort | uniq | wc -l
+			#allorders = parent(plant_tids, taxdir='../../taxonomy', rank='order')
+
+		# of genera of Viridiplantae in the NCBI taxonomy (as of August, 2017) is: 
+	#kraken
+	k.GTP = length(intersect(parentG, k.Gtop$taxid))
+	k.GFN = length(sim.tid[[1]]) - k.GTP;
+	k.GFP = length(k.Gtop$taxid) - k.GTP;
+	k.GTPR = k.GTP/(k.GTP+k.GFN) ## Sensitivity probability
+	k.GPPP = k.GTP/(k.GTP+k.GFP) ## Positive Predictive Power -- Relative Precision
+	k.GFNR = k.GFN/(k.GTP+k.GFN); #same as 1-k.TPR 
+	##NOTE FPR and TNR are difficult to define because the TN proportion is very large. 
+	# so FPR is always ~0 and TNR is always ~1.	
+
+	k.OTP = length(intersect(parentO, k.Otop$taxid))
+	k.OFN = length(sim.tid[[1]]) - k.OTP;
+	k.OFP = length(k.Otop$taxid) - k.OTP;
+	k.OTPR = k.OTP/(k.OTP+k.OFN)
+	k.OPPP = k.OTP/(k.OTP+k.OFP) ## Positive Predictive Power -- Relative Precision
+	k.OFNR = k.OFN/(k.OTP+k.OFN); #same as 1-k.TPR
+
+	##Centrifuge:
+	c.GTP = length(intersect(parentG, c.Gtop$taxid))
+	c.GFN = length(sim.tid[[1]]) - c.GTP;
+	c.GFP = length(c.Gtop$taxid) - c.GTP;
+	c.GTPR = c.GTP/(c.GTP+c.GFN)
+	c.GPPP = c.GTP/(c.GTP+c.GFP) ## Positive Predictive Power -- Relative Precision
+	c.GFNR = c.GFN/(c.GTP+c.GFN); #same as 1-c.TPR
+
+	c.OTP = length(intersect(parentO, c.Otop$taxid))
+	c.OFN = length(sim.tid[[1]]) - c.OTP;
+	c.OFP = length(c.Otop$taxid) - c.OTP;
+	c.OTPR = c.OTP/(c.OTP+c.OFN)
+	c.OPPP = c.OTP/(c.OTP+c.OFP) ## Positive Predictive Power -- Relative Precision
+	c.OFNR = c.OFN/(c.OTP+c.OFN); #same as 1-c.TPR
+
+	#megablast
+	parent.genera = CHNOSZ::sciname(parentG, '../../taxonomy')
+	parent.orders = CHNOSZ::sciname(parentO, '../../taxonomy')
+#	b.genlist = merge(b.gsum, b.m, by.x='Group.1', by.y='name')
+#	b.genid = CHNOSZ::parent(b.genlist$taxID, taxdir='../../taxonomy', rank="genus")
+			
+	b.GTP = length(intersect(parent.genera, b.genera[,1]))
+	b.GFN = length(parent.genera) - b.GTP;
+	b.GFP = nrow(b.genera) - b.GTP;
+	b.GTPR = b.GTP/(b.GTP+b.GFN)
+	b.GPPP = b.GTP/(b.GTP+b.GFP) ## Positive Predictive Power -- Relative Precision
+	b.GFNR = b.GFN/(b.GTP+b.GFN); #same as 1-c.TPR
+
+#	b.ordlist = merge(b.osum, b.ord, by.x='Group.1', by.y='ord')
+#	b.ordid = unique(CHNOSZ::parent(unique(b.ordlist$taxID), taxdir='../../taxonomy', rank="order"))
+
+
+	b.OTP = length(intersect(parent.orders, b.orders[,1]))
+	b.OFN = length(parent.orders) - b.OTP;
+	b.OFP = nrow(b.orders) - b.OTP;
+	b.OTPR = b.OTP/(b.OTP+b.OFN)
+	b.OPPP = b.OTP/(b.OTP+b.OFP) ## Positive Predictive Power -- Relative Precision
+	b.OFNR = b.OFN/(b.OTP+b.OFN); #same as 1-b.TPR
+
+	##Compare TPR
+	tpr.g = cbind(k.GTPR, c.GTPR, b.GTPR)
+	tpr.o = cbind(k.OTPR, c.OTPR, b.OTPR)
+ 	##Compare PPP
+	ppp.o = cbind(k.OPPP, c.OPPP, b.OPPP)
+	ppp.g = cbind(k.GPPP, c.GPPP, b.GPPP)
+	
+	write.table(tpr.g, file='gtpr.o')
+	write.table(tpr.o, file='otpr.o')
+	write.table(ppp.o, file='oppp.o')
+	write.table(ppp.g, file='gppp.o')
+}
+
+q('no');
+

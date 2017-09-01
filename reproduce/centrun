@@ -1,0 +1,14 @@
+#!/bin/bash
+#PBS -V
+#PBS -N centrifuge-run
+#PBS -l nodes=1:ppn=4
+#PBS -l walltime=200:00:00
+
+cd ~/nas3/meta/centrifuge
+#head -500 /nas3/database/nt_fa/nt.fa
+
+
+#centrifuge-build -p 16 --bmax 1942177280 --conversion-table /nas3/database/nt_fa/acc2tid.map --taxonomy-tree ../taxonomy/nodes.dmp --name-table ../taxonomy/names.dmp /nas3/database/nt_fa/nt.fa ../centrifuge/nucind2
+
+#centrifuge -p 64 -q -x ~/nas3/meta/centrifuge/nucind2 -U ../fastq/ERR1560012.fastq -S centclass --report-file cenrifuge_report.tab
+centrifuge -p 4 -q -x ~/nas3/meta/centrifuge/allplants -U ../fastq/ERR1560012.fastq -S centclass --report-file cenrifuge_report.tab

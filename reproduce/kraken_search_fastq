@@ -1,0 +1,163 @@
+#!/bin/bash
+#PBS -V
+#PBS -N kraken_search
+#PBS -l nodes=1:ppn=4
+
+#PBS -l walltime=10:00:00
+module load bamtools-2.4.1
+module load blast-2.2.26
+module load R-3.4.1
+
+infile=$1
+outdir=$2
+workdir=$3
+echo $PWD
+cd $workdir
+basedir=$(echo $PWD) ##SHOULD BE STARTED IN DIRECTORY WHERE DATABASE DIRECTORIES LIVE
+echo $basedir
+
+bname=$(basename $infile);
+NAME=`echo "$bname" | cut -d'.' -f1`
+EXTENSION=`echo "$bname" | cut -d'.' -f2`
+mkdir $outdir/$NAME
+cd $outdir/$NAME
+
+
+##QC Filter reads
+echo Step 1. Removing poly A tails
+fastq-grep -v "AAAAA$" $infile > kmer_$bname
+echo Step 2. Removing reverse complemented A tails
+fastq-grep -v "^TTTTT" kmer_$bname > kmer2_$bname
+#bzip2 kmer_$bname &
+echo Step 3. Removing rememnants adapter sequence 1 = AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC
+fastq-grep -v "AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC" kmer2_$bname > adap1_kmer2_$bname
+#bzip2 kmer2_$bname &
+echo Step 4. Removing remnants adapter sequence 2 = ATCTCGTATGCCGTCTTCTGCTTG
+fastq-grep -v "ATCTCGTATGCCGTCTTCTGCTTG" adap1_kmer2_$bname > adap2_kmer2_$bname
+#bzip2 adap1_kmer2_$bname &
+echo Step 5. Counting sequences matching vector tracer 'ATTAACCCTCACTAAAGGGACTAGTCCTGCAGGTTTAAACGAATTCGCCCTTAAGGGCGAATTCGCGGCCGCTAAATTCAATTCGCCCTATAGTGAGTCGTATTA' =
+fastq-grep -c "ATTAACCCTCACTAAAGGGACTAGTCCTGCAGGTTTAAACGAATTCGCCCTTAAGGGCGAATTCGCGGCCGCTAAATTCAATTCGCCCTATAGTGAGTCGTATTA" adap2_kmer2_$bname
+
+##SGA processing:
+nice -n 5 sga preprocess --dust-threshold=1 -m 30 adap2_kmer2_$bname -o adap2_kmer2_$bname.pp.fq
+#bzip2 adap2_kmer2_$bname
+echo Step 7. sga index
+sga index --algorithm=ropebwt --threads=4 adap2_kmer2_$bname.pp.fq
+echo Step 8. sga filter
+#removes duplicates
+sga filter --threads=4  --no-kmer-check adap2_kmer2_$bname.pp.fq -o adap2_kmer2_$bname.pp.rmdup.fq
+#echo Step 9. sga assemble contigs
+#sga overlap -m 10 -t 4 adap2_kmer2_$bname.pp.rmdup.fq
+#sga assemble -m 10 -g 0 -r 10 -o assemble_$bname adap2_kmer2_$bname.pp.rmdup.asqg.gz
+
+###CLEAN UP INTERMEDIATE FILES...
+rm adap1_kmer2_$bname
+rm adap2_kmer2_$bname
+rm adap2_kmer2_$bname.pp.bwt
+#rm adap2_kmer2_$bname.pp.fq
+rm adap2_kmer2_$bname.pp.rbwt
+rm adap2_kmer2_$bname.pp.rmdup.asqg.gz
+rm adap2_kmer2_$bname.pp.rmdup.bwt
+rm adap2_kmer2_$bname.pp.rmdup.discard.fa
+rm adap2_kmer2_$bname.pp.rmdup.rbwt
+rm adap2_kmer2_$bname.pp.rmdup.rsai
+rm adap2_kmer2_$bname.pp.rmdup.sai
+rm adap2_kmer2_$bname.pp.rsai
+rm adap2_kmer2_$bname.pp.sai
+rm kmer2_$bname
+rm kmer_$bname
+
+
+
+##Work on adap2_kmer2_$bname.pp.fq
+echo Step 9. Calculating read length distribution and outputting file
+#cat assemble_$bname-contigs.fa | awk '{if(NR%4==2) print length($1)}' | sort -n | uniq -c > assembled.read_length.txt
+cat adap2_kmer2_$bname.pp.rmdup.fq | awk '{if(NR%4==2) print length($1)}' | sort -n | uniq -c > cleaned.read_length.txt
+
+###RUn Centrifuge (NOTE: Centrifuge is used in place of the rest of the HOLI pipeline here because both use bowtie2 to align reads but Centrifuge offers more tools for reporting and viewing results).
+
+###MAKE SURE to build a centrifuge index first (see notes in cent command file)
+
+mkdir cent
+
+#cat assemble_$bname-contigs.fa assemble_$bname-variants.fa > assembly.fa
+SECONDS=0;
+centrifuge -p 4 -q -x $basedir/centrifuge/allplants -U adap2_kmer2_$bname.pp.rmdup.fq -S ./cent/centclass --report-file ./cent/centrifuge_report.tab
+
+#SECONDS=0;
+#centrifuge -p 4 -f -x $basedir/centrifuge/nucind2 -U assembly.fa -S ./cent/centclass --report-file ./cent/centrifuge_report.tab 
+
+
+centrifuge-kreport -x $basedir/centrifuge/allplants ./cent/centclass > ./cent/centrepor.k
+echo "Centrifuge took $SECONDS seconds to run...";
+centtime=$SECONDS;
+
+#centrifuge kreport -x ~/nas3/meta/centrifuge/nucind2 ./cent/centrifuge_report.tab
+#cut -f1,3 ./cent/centclass > ./cent/ckrona.in
+#../../Krona/KronaTools/scripts/ImportTaxonomy.pl  ./cent/ckrona.in -o ./cent/krona.html
+
+
+
+##RUN KRAKEN
+mkdir krak
+SECONDS=0;
+kraken --preload --threads 4 -q  --db $basedir/kdb_test adap2_kmer2_$bname.pp.fq > ./krak/soil.kraken
+#kraken-filter --db $basedir/kdb_test --threshold 0.05 ./krak/soil.kraken > ./krak/soil.kfilter
+kraken-translate --db $basedir/kdb_test ./krak/soil.kraken > ./krak/soil.labels
+kraken-report --db $basedir/kdb_test ./krak/soil.kraken > ./krak/kreport
+
+
+echo "Kraken took $SECONDS seconds to run...";
+krakentime=$SECONDS;
+#cut -f2,3 ./krak/soil.kfilter > ./krak/krona.in
+
+#../../Krona/KronaTools/scripts/ImportTaxonomy.pl ./krak/krona.in -o ./krak/krona.html
+
+
+##Megablast
+mkdir mblast
+SECONDS=0;
+sed -n '1~4s/^@/>/p;2~4p' adap2_kmer2_$bname.pp.rmdup.fq > adap2_kmer2_$bname.pp.rmdup.fa
+megablast -d $basedir/blastdb/ref.fa -i adap2_kmer2_$bname.pp.rmdup.fa -D 3 -t 18 -W 11 > ./mblast/mblast.o
+##Look at ktBClassifyBLAST from KronaTools -- > should read blast tab format and classify LCAs.
+#$basedir/Krona/KronaTools/updateAccessions.sh ##MAy need to run 1st time only
+$basedir/Krona/KronaTools/bin/ktClassifyBLAST -t 10 -s -p ./mblast/mblast.o -o ./mblast/blast.tax
+$basedir/Krona/KronaTools/bin/ktClassifyBLAST ./mblast/mblast.o -o ./mblast/blastraw.tax
+cut -f2 ./mblast/blast.tax | $basedir/Krona/KronaTools/bin/ktGetTaxInfo > ./mblast/blast.tax.info
+
+## Can harvest blast.tax.info for genus counts
+
+#$basedir/Krona/KronaTools/bin/ktImportTaxonomy blast.taxonomy.tab
+
+echo "Megablast took $SECONDS seconds to run...";
+blasttime=$SECONDS;
+
+
+echo $centtime $krakentime $blasttime > timefile.o
+
+trimreadc=$(grep "@" adap2_kmer2_$bname.pp.rmdup.fq | wc -l);
+echo $trimreadc > read.count
+
+
+
+##Get threshold classification tables and barplot summaries for genera and orders classified by each method.
+Rscript $basedir/reproduce/R_metaprocess
+
+
+
+##Percent classified
+#kraken 
+khits=$(awk -F " " '{print $2}' krakhits.o);
+chits=$(awk -F " " '{print $2}' centhits.o);
+mbhits=$(awk -F " " '{print $2}' blasthits.o);
+
+pkrak=$(echo "scale=10; $khits / $trimreadc" | bc)
+pcent=$(echo "scale=10; $chits / $trimreadc" | bc) 
+pmb=$(echo "scale=10; $mbhits / $trimreadc" | bc) 
+
+echo $pcent $pkrak $pmb > percentclass.o
+
+
+
+
+

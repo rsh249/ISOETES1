@@ -1,0 +1,9 @@
+
+##Search options:
+#just refseq chloroplast seqs (1592)
+chloroplast[All Fields] AND (refseq[filter] AND chloroplast[filter]
+
+##genbank
+chloroplast[All Fields] AND (genbank[filter] AND chloroplast[filter])
+
+##all genes

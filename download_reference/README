@@ -1,0 +1,8 @@
+##How to run ncbi2kraken.py
+##This is a python script that executes an NCBI nucleotide database search and translates resulting sequences to kraken compatible fasta files for inclusion in custom databses.
+
+./ncbi2kraken.py -e <email> -s <ncbi search string> -o <output directory>
+
+#Test query strings here before running: 
+#Email is required, speeds up queries by using search history.
+#Output directory will be created if it does not exist.

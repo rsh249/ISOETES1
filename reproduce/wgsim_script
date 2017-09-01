@@ -1,0 +1,15 @@
+##Get 5 random chloroplast genomes
+#Max index number:
+to=$(grep ">" ./plastids_refseq/final.fa | wc -l) #Get number of fasta records
+
+#Random number between 1 and max index:
+randnum=$(( ( RANDOM % $to )  + 1 ))
+
+#Get random number -5 sequences: #NOT TRULY RANDOM without shuffle step.
+awk -v RS='>' 'NR>1 {gsub("\n", ";", $0); sub(";$", "", $0); print ">"$0}' ./plastids_refseq/final.fa | shuf |head -n $randnum | tail -5 | tr ';' '\n' > ./sample.fa
+
+##wgsim on sample.fa
+./wgsim/wgsim -N 50000000 ./sample.fa ./fastq/out1.fq /dev/null > sim.log
+qsub -V -N sim -l walltime=12:00:00,nodes=1:ppn=16 -- /usr/bin/bash ~/nas3/meta/reproduce/kraken_search_fastq "~/nas3/meta/fastq/out1.fq"
+
+
