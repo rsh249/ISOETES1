@@ -72,9 +72,9 @@ Get sequence data from NCBI and attach accession and taxon ID to each record in 
 ```
 mkdir plastids_refseq 
 #Note, the script below creates parallel download processes. This is not advised on wireless internet.
-./get_plastid_genes/ncbi2kraken.py -e 'your@email.address' -s 'chloroplast[All Fields] AND (refseq[filter] AND chloroplast[filter]' -o ./plastids_refseq
+./download_referenc/ncbi2kraken.py -e 'your@email.address' -s 'chloroplast[All Fields] AND (refseq[filter] AND chloroplast[filter]' -o ./plastids_refseq
 mkdir plants_genbank
-./get_plastid_genes/ncbi2kraken.py -e 'your@email.address' -s 'genbank[filter] AND (plants[filter] AND biomol_genomic[PROP] AND ("200"[SLEN] : "5000"[SLEN]))' -o ./plants_genbank
+./download_reference/ncbi2kraken.py -e 'your@email.address' -s 'genbank[filter] AND (plants[filter] AND biomol_genomic[PROP] AND ("200"[SLEN] : "5000"[SLEN]))' -o ./plants_genbank
 
 #Merge files and convert to centrifuge compatible files
 cat ./plastids_refseq/final.fa ./plants_genbank/final.fa > ref.fa
@@ -102,7 +102,8 @@ kraken-build --clean --db ./kdb_test
 mkdir centrifuge ##May need to change name if you installed centrifuge in your ISOETES directory
 ##BEWARE centrifuge-build will require an enormous amount of RAM for building the database. Adjust bmax down if this is a problem.
 centrifuge-download -o taxonomy taxonomy
-centrifuge-build -p 16 --bmax 819356040 --conversion-table acc2tid.map --taxonomy-tree ./taxonomy/nodes.dmp --name-table ./taxonomy/names.dmp ./centref.fa ./centrifuge/plants2
+centrifuge-build -p 16 --bmax 1619356040 --conversion-table acc2tid.map --taxonomy-tree ./taxonomy/nodes.dmp --name-table ./taxonomy/names.dmp ./centref.fa ./centrifuge/plants2
+
 
 
 #Make blast databse:
@@ -160,3 +161,5 @@ mkdir meta_sim
 ./reproduce/kraken_search_fastq ./fastq/sample_ID.fastq soils.res /full/path/to/ISOETES1
 
 ```
+
+## Look at compile.R and process_taxa.R in the reproduce directory for code to generate summary figures in R
