@@ -7,6 +7,7 @@ Harbert, R.S. 2018. Algorithms and strategies in short-read shotgun
 	metagenomic reconstruction of plant communities. Applications in Plant Sciences [In Press].
 
 NOTE: ANY FUTURE DEVELOPMENT OF THIS CODE WILL GO INTO A NEW REPOSITORY: ISOETES2. 
+
 #This is a legacy pipeline for publication documentation ONLY, and is not meant to be suitable for reuse "as-is".
 	
 In read classification scripts QC and sga preprocessing steps were adapted from the HOLI pipeline (https://github.com/ancient-eDNA/Holi)
