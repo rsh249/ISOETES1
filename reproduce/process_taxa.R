@@ -1,5 +1,11 @@
-charlie = read.table('charlie_lake.csv', sep=',', header=TRUE)
-silver = read.table('silver_lake.csv', sep=',', header=TRUE) #by silver lake I obviously mean spring lake
+
+##Get supplementary files from Pedersen et al. 2016
+##
+##Lake summary data are directly from:
+#https://www.nature.com/nature/journal/v537/n7618/source_data/nature19085-sf6.xlsx
+#and https://www.nature.com/nature/journal/v537/n7618/source_data/nature19085-sf5.xlsx
+charlie = read.table('./reproduce/charlie_lake.csv', sep=',', header=TRUE)
+silver = read.table('./reproduce/silver_lake.csv', sep=',', header=TRUE) #by silver lake I obviously mean spring lake
 
 charlie=charlie[,1:58]
 silver=silver[,1:77]
