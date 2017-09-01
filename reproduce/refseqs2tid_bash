@@ -1,9 +1,0 @@
-grep ">" ref.fa | awk -F"|" '{print $1}' | sed 's/>//' | sed 's/>//' > ref.acc
-
-##Map acc to TID 
-#grep -f ref.acc acc2tid.map > ref.tids #Uses way too much memory (>100GB WTF?)
-
-
-##Use R CHSONZ to map taxid to genus and order
-##Get unique # of genera and orders
-

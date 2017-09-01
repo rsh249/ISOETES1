@@ -1,10 +1,16 @@
-# ISOETES1 - A 
+# ISOETES1 - A pipeline for classification of short-read plant metagenomic data from environmental or ancient DNA
+
+## ISOETES1 is a copyright of Robert S. Harbert, 2017 and is shared according to the CC-BY-NC-SA license.
 
 Code in this repository is associated with analyses done for:
 Harbert, R.S. 2018. Algorithms and strategies in short-read shotgun 
 	metagenomic reconstruction of plant communities. Applications in Plant Sciences [In Press].
+
+NOTE: ANY FUTURE DEVELOPMENT OF THIS CODE WILL GO INTO A NEW REPOSITORY: ISOETES2. 
+#This is a legacy pipeline for publication documentation ONLY, and is not meant to be suitable for reuse "as-is".
 	
-	
+In read classification scripts QC and sga preprocessing steps were adapted from the HOLI pipeline (https://github.com/ancient-eDNA/Holi)
+
 # Install dependencies:
 Note: You will also need to make sure you have MegaBLAST installed.
 
